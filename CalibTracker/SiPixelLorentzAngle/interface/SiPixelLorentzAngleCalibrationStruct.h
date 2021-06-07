@@ -13,6 +13,7 @@ public:
   // hardcode 4 BPix layers
   int nlay;
   int nModules_[4];
+  std::map<uint32_t, std::vector<uint32_t> > detIdsList;
 
   MonitorMap h_drift_depth_adc_;
   MonitorMap h_drift_depth_adc2_;

@@ -13,6 +13,8 @@
 #include "Geometry/Records/interface/TrackerDigiGeometryRecord.h"
 #include "../interface/SiPixelLorentzAngleCalibrationStruct.h"
 #include "CondCore/DBOutputService/interface/PoolDBOutputService.h"
+#include "CondFormats/SiPixelObjects/interface/SiPixelLorentzAngle.h"
+#include "CondFormats/DataRecord/interface/SiPixelLorentzAngleRcd.h"
 
 #include <fmt/format.h>
 #include <fmt/printf.h>
@@ -33,9 +35,14 @@ private:
   // es tokens
   edm::ESGetToken<TrackerGeometry, TrackerDigiGeometryRecord> geomEsToken_;
   edm::ESGetToken<TrackerTopology, TrackerTopologyRcd> topoEsToken_;
+  edm::ESGetToken<SiPixelLorentzAngle, SiPixelLorentzAngleRcd> siPixelLAEsToken_;
 
   const std::string dqmDir_;
+  const double fitProbCut_;
+  const std::string recordName_;
+
   SiPixelLorentzAngleCalibrationHistograms hists;
+  const SiPixelLorentzAngle* currentLorentzAngle;
 };
 
 //------------------------------------------------------------------------------
@@ -43,7 +50,10 @@ private:
 SiPixelLorentzAnglePCLHarvester::SiPixelLorentzAnglePCLHarvester(const edm::ParameterSet& iConfig)
     : geomEsToken_(esConsumes<edm::Transition::BeginRun>()),
       topoEsToken_(esConsumes<edm::Transition::BeginRun>()),
-      dqmDir_(iConfig.getParameter<std::string>("dqmDir")) {
+      siPixelLAEsToken_(esConsumes<edm::Transition::BeginRun>()),
+      dqmDir_(iConfig.getParameter<std::string>("dqmDir")),
+      fitProbCut_(iConfig.getParameter<double>("fitProbCut")),
+      recordName_(iConfig.getParameter<std::string>("record")) {
   // first ensure DB output service is available
   edm::Service<cond::service::PoolDBOutputService> poolDbService;
   if (!poolDbService.isAvailable())
@@ -57,11 +67,31 @@ void SiPixelLorentzAnglePCLHarvester::beginRun(const edm::Run& iRun, const edm::
   const TrackerGeometry* geom = &iSetup.getData(geomEsToken_);
   const TrackerTopology* tTopo = &iSetup.getData(topoEsToken_);
 
+  currentLorentzAngle = &iSetup.getData(siPixelLAEsToken_);
+
   PixelTopologyMap map = PixelTopologyMap(geom, tTopo);
   hists.nlay = geom->numberOfLayers(PixelSubdetector::PixelBarrel);
 
   for (int i = 0; i < hists.nlay; i++) {
     hists.nModules_[i] = map.getPXBModules(i + 1);
+  }
+
+  std::vector<uint32_t> treatedIndices;
+
+  for (auto det : geom->detsPXB()) {
+    const PixelGeomDetUnit* pixelDet = dynamic_cast<const PixelGeomDetUnit*>(det);
+    const auto& layer = tTopo->pxbLayer(pixelDet->geographicalId());
+    const auto& module = tTopo->pxbModule(pixelDet->geographicalId());
+    int i_index = module + (layer - 1) * hists.nModules_[layer - 1];
+
+    uint32_t rawId = pixelDet->geographicalId().rawId();
+
+    if (std::find(treatedIndices.begin(), treatedIndices.end(), i_index) != treatedIndices.end()) {
+      hists.detIdsList.at(i_index).push_back(rawId);
+    } else {
+      hists.detIdsList.insert(std::pair<uint32_t, std::vector<uint32_t>>(i_index, {rawId}));
+      treatedIndices.push_back(i_index);
+    }
   }
 }
 
@@ -142,6 +172,9 @@ void SiPixelLorentzAnglePCLHarvester::dqmEndJob(DQMStore::IBooker& iBooker, DQMS
             << "chi2"
             << "\t"
             << "prob" << std::endl;
+
+  SiPixelLorentzAngle* LorentzAngle = new SiPixelLorentzAngle();
+
   //loop over modlues and layers to fit the lorentz angle
   for (int i_layer = 1; i_layer <= hists.nlay; i_layer++) {
     for (int i_module = 1; i_module <= hists.nModules_[i_layer - 1]; i_module++) {
@@ -162,16 +195,93 @@ void SiPixelLorentzAnglePCLHarvester::dqmEndJob(DQMStore::IBooker& iBooker, DQMS
       std::cout << std::setprecision(4) << i_module << "\t" << i_layer << "\t" << p0 << "\t" << e0 << "\t" << p1
                 << std::setprecision(3) << "\t" << e1 << "\t" << e1 / p1 * 100. << "\t" << (p1 - 0.424) / e1 << "\t"
                 << chi2 << "\t" << prob << std::endl;
+
+      const auto& detIdsToFill = hists.detIdsList.at(i_index);
+
+      /*
+      std::cout << i_index << " ";
+      for (const auto& id : detIdsToFill) {
+        std::cout << id << " ";
+      }
+      std::cout << std::endl;
+      */
+
+      float bPixLorentzAnglePerTesla_;
+      // if the fit quality is OK
+      if (prob > fitProbCut_) {
+        for (const auto& id : detIdsToFill) {
+          bPixLorentzAnglePerTesla_ = p1 / 3.8f;
+          if (!LorentzAngle->putLorentzAngle(id, bPixLorentzAnglePerTesla_)) {
+            edm::LogError("SiPixelLorentzAnglePCLHarvester")
+                << "[SiPixelLorentzAnglePCLHarvester::dqmEndRun] detid already exists" << std::endl;
+          }
+        }
+      } else {
+        // just copy the values from the existing payload
+        for (const auto& id : detIdsToFill) {
+          bPixLorentzAnglePerTesla_ = currentLorentzAngle->getLorentzAngle(id);
+          if (!LorentzAngle->putLorentzAngle(id, bPixLorentzAnglePerTesla_)) {
+            edm::LogError("SiPixelLorentzAnglePCLHarvester")
+                << "[SiPixelLorentzAnglePCLHarvester::dqmEndRun] detid already exists" << std::endl;
+          }
+        }
+      }
     }
   }  // end loop over modules and layers
 
-  /*
+  // fill the rest of DetIds not filled above (for the moment FPix)
+  const auto& currentLAMap = currentLorentzAngle->getLorentzAngles();
+  const auto& newLAMap = LorentzAngle->getLorentzAngles();
+  std::vector<unsigned int> currentLADets;
+  std::vector<unsigned int> newLADets;
+
+  std::transform(currentLAMap.begin(),
+                 currentLAMap.end(),
+                 std::back_inserter(currentLADets),
+                 [](const std::map<unsigned int, float>::value_type& pair) { return pair.first; });
+
+  std::transform(newLAMap.begin(),
+                 newLAMap.end(),
+                 std::back_inserter(newLADets),
+                 [](const std::map<unsigned int, float>::value_type& pair) { return pair.first; });
+
+  std::vector<unsigned int> notCommon;
+  std::set_symmetric_difference(
+      currentLADets.begin(), currentLADets.end(), newLADets.begin(), newLADets.end(), std::back_inserter(notCommon));
+
+  for (const auto& id : notCommon) {
+    float fPixLorentzAnglePerTesla_ = currentLorentzAngle->getLorentzAngle(id);
+    if (!LorentzAngle->putLorentzAngle(id, fPixLorentzAnglePerTesla_)) {
+      edm::LogError("SiPixelLorentzAnglePCLHarvester")
+          << "[SiPixelLorentzAnglePCLHarvester::dqmEndRun] detid already exists" << std::endl;
+    }
+  }
+
+  // book histogram of differences
+  MonitorElement* h_diffLA = iBooker.book1D(
+      "h_diffLA", "difference in #mu_{H}; #Delta #mu_{H}/#mu_{H} (old-new)/old [%];n. modules", 100, -10, 10);
+
+  for (const auto& id : newLADets) {
+    float deltaMuHoverMuH = (currentLorentzAngle->getLorentzAngle(id) - LorentzAngle->getLorentzAngle(id)) /
+                            currentLorentzAngle->getLorentzAngle(id);
+    h_diffLA->Fill(deltaMuHoverMuH);
+  }
+
   // fill the DB object record
- 
-  // write the object
-  edm::Service<cond::service::PoolDBOutputService> poolDbService;
-  poolDbService->writeOne(& , poolDbService->currentTime(), "SiPixelLorentzAngleRcd");
-  */
+  edm::Service<cond::service::PoolDBOutputService> mydbservice;
+  if (mydbservice.isAvailable()) {
+    try {
+      mydbservice->writeOne(LorentzAngle, mydbservice->currentTime(), recordName_);
+    } catch (const cond::Exception& er) {
+      edm::LogError("SiPixelLorentzAngleDB") << er.what() << std::endl;
+    } catch (const std::exception& er) {
+      edm::LogError("SiPixelLorentzAngleDB") << "caught std::exception " << er.what() << std::endl;
+    } catch (...) {
+      edm::LogError("SiPixelLorentzAngleDB") << "Funny error" << std::endl;
+    }
+  } else {
+    edm::LogError("SiPixelLorentzAngleDB") << "Service is unavailable" << std::endl;
+  }
 }
 
 void SiPixelLorentzAnglePCLHarvester::findMean(MonitorElement* h_drift_depth_adc_slice_, int i, int i_ring) {
@@ -221,6 +331,8 @@ void SiPixelLorentzAnglePCLHarvester::findMean(MonitorElement* h_drift_depth_adc
 void SiPixelLorentzAnglePCLHarvester::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
   desc.add<std::string>("dqmDir", "AlCaReco/SiPixelLorentzAngle");
+  desc.add<double>("fitProbCut", 0.5);
+  desc.add<std::string>("record", "SiPixelLorentzAngleRcd");
   descriptions.addWithDefaultLabel(desc);
 }
 
