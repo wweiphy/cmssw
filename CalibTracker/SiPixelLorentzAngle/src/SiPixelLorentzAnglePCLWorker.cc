@@ -604,7 +604,7 @@ void SiPixelLorentzAnglePCLWorker::dqmAnalyze(edm::Event const& iEvent,
           float cotbeta = 1. / TMath::Tan(trackhit_.beta);
           float locBx = 1.;
           if (cotbeta < 0.)
-             ocBx = -1.;
+             locBx = -1.;
           float locBz = locBx;
           if (cotalpha < 0.)
             locBz = -locBx;
