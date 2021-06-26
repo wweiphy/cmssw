@@ -4,9 +4,7 @@
 // Class:      SiPixelLorentzAnglePCLWorker
 //
 /**\class SiPixelLorentzAnglePCLWorker SiPixelLorentzAnglePCLWorker.cc CalibTracker/SiPixelLorentzAnglePCLWorker/plugins/SiPixelLorentzAnglePCLWorker.cc
-
  Description: [one line class summary]
-
  Implementation:
      [Notes on implementation]
 */
@@ -56,7 +54,7 @@
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "../interface/SiPixelLorentzAngleCalibrationStruct.h"
 #include <TTree.h>
-
+#include <TFile.h>
 //
 // class declaration
 //
@@ -115,6 +113,10 @@ private:
                   SiPixelLorentzAngleCalibrationHistograms const&) const override;
 
   void dqmBeginRun(edm::Run const&, edm::EventSetup const&, SiPixelLorentzAngleCalibrationHistograms&) const override;
+    
+  void dqmEndRun(edm::Run const&,
+                 edm::EventSetup const&,
+                 SiPixelLorentzAngleCalibrationHistograms const&) const override;
 
   const Pixinfo fillPix(const SiPixelCluster& LocPix, const PixelTopology* topol) const;
   const std::pair<LocalPoint, LocalPoint> surface_deformation(const PixelTopology* topol,
@@ -122,7 +124,8 @@ private:
                                                               const SiPixelRecHit* recHitPix) const;
   // ------------ member data ------------
   std::string folder_;
-
+  std::string filename_;
+    
   // histogram etc
   int hist_x_;
   int hist_y_;
@@ -147,9 +150,10 @@ private:
   int hist_depth_;
   int hist_drift_;
     
-  TTree* SiPixelLorentzAngleTree_;
-  TTree* SiPixelLorentzAngleTreeForward_;
-
+  std::unique_ptr<TFile> hFile_;
+  std::shared_ptr<TTree> SiPixelLorentzAngleTreeBarrel_;
+  std::shared_ptr<TTree> SiPixelLorentzAngleTreeForward_;
+    
   // es consumes
   edm::ESGetToken<TrackerGeometry, TrackerDigiGeometryRecord> geomEsToken_;
   edm::ESGetToken<TrackerTopology, TrackerTopologyRcd> topoEsToken_;
@@ -221,6 +225,7 @@ float rQmQtF_;
 //
 SiPixelLorentzAnglePCLWorker::SiPixelLorentzAnglePCLWorker(const edm::ParameterSet& iConfig)
     : folder_(iConfig.getParameter<std::string>("folder")),
+      filename_(iConfig.getParameter<std::string>("fileName")),
       ptmin_(iConfig.getParameter<double>("ptMin")),
       normChi2Max_(iConfig.getParameter<double>("normChi2Max")),
       clustSizeYMin_(iConfig.getParameter<int>("clustSizeYMin")),
@@ -247,43 +252,44 @@ SiPixelLorentzAnglePCLWorker::SiPixelLorentzAnglePCLWorker(const edm::ParameterS
   max_depth_ = 400.;
   min_drift_ = -1000.;  //-200.;(iConfig.getParameter<double>("residualMax"))
   max_drift_ = 1000.;   //400.;
-        
-bufsize = 64000;
+
+ bufsize = 64000;
 //    create tree structure
 //    Barrel pixel
-SiPixelLorentzAngleTree_ = new TTree("SiPixelLorentzAngleTree_","SiPixel LorentzAngle tree", bufsize);
-SiPixelLorentzAngleTree_->Branch("run", &run_, "run/I", bufsize);
-SiPixelLorentzAngleTree_->Branch("event", &event_, "event/l", bufsize);
-SiPixelLorentzAngleTree_->Branch("lumiblock", &lumiblock_, "lumiblock/I", bufsize);
-SiPixelLorentzAngleTree_->Branch("bx", &bx_, "bx/I", bufsize);
-SiPixelLorentzAngleTree_->Branch("orbit", &orbit_, "orbit/I", bufsize);
-SiPixelLorentzAngleTree_->Branch("module", &module_, "module/I", bufsize);
-SiPixelLorentzAngleTree_->Branch("ladder", &ladder_, "ladder/I", bufsize);
-SiPixelLorentzAngleTree_->Branch("layer", &layer_, "layer/I", bufsize);
-SiPixelLorentzAngleTree_->Branch("isflipped", &isflipped_, "isflipped/I", bufsize);
-SiPixelLorentzAngleTree_->Branch("pt", &pt_, "pt/F", bufsize);
-SiPixelLorentzAngleTree_->Branch("eta", &eta_, "eta/F", bufsize);
-SiPixelLorentzAngleTree_->Branch("phi", &phi_, "phi/F", bufsize);
-SiPixelLorentzAngleTree_->Branch("chi2", &chi2_, "chi2/D", bufsize);
-SiPixelLorentzAngleTree_->Branch("ndof", &ndof_, "ndof/D", bufsize);
-SiPixelLorentzAngleTree_->Branch("trackhit", &trackhit_, "x/F:y/F:alpha/D:beta/D:gamma_/D", bufsize);
-SiPixelLorentzAngleTree_->Branch("npix", &pixinfo_.npix, "npix/I", bufsize);
-SiPixelLorentzAngleTree_->Branch("rowpix", pixinfo_.row, "row[npix]/F", bufsize);
-SiPixelLorentzAngleTree_->Branch("colpix", pixinfo_.col, "col[npix]/F", bufsize);
-SiPixelLorentzAngleTree_->Branch("adc", pixinfo_.adc, "adc[npix]/F", bufsize);
-SiPixelLorentzAngleTree_->Branch("xpix", pixinfo_.x, "x[npix]/F", bufsize);
-SiPixelLorentzAngleTree_->Branch("ypix", pixinfo_.y, "y[npix]/F", bufsize);
+hFile_ = std::make_unique<TFile>(filename_.c_str(), "RECREATE");
+SiPixelLorentzAngleTreeBarrel_ = std::make_shared<TTree>("SiPixelLorentzAngleTreeBarrel_","SiPixel LorentzAngle tree barrel", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("run", &run_, "run/I", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("event", &event_, "event/l", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("lumiblock", &lumiblock_, "lumiblock/I", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("bx", &bx_, "bx/I", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("orbit", &orbit_, "orbit/I", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("module", &module_, "module/I", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("ladder", &ladder_, "ladder/I", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("layer", &layer_, "layer/I", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("isflipped", &isflipped_, "isflipped/I", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("pt", &pt_, "pt/F", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("eta", &eta_, "eta/F", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("phi", &phi_, "phi/F", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("chi2", &chi2_, "chi2/D", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("ndof", &ndof_, "ndof/D", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("trackhit", &trackhit_, "x/F:y/F:alpha/D:beta/D:gamma_/D", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("npix", &pixinfo_.npix, "npix/I", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("rowpix", pixinfo_.row, "row[npix]/F", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("colpix", pixinfo_.col, "col[npix]/F", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("adc", pixinfo_.adc, "adc[npix]/F", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("xpix", pixinfo_.x, "x[npix]/F", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("ypix", pixinfo_.y, "y[npix]/F", bufsize);
 
-SiPixelLorentzAngleTree_->Branch("clust", &clust_, "x/F:y/F:charge/F:size_x/I:size_y/I:maxPixelCol/I:maxPixelRow:minPixelCol/I:minPixelRow/I", bufsize);
-SiPixelLorentzAngleTree_->Branch("rechit", &rechit_, "x/F:y/F", bufsize);
-SiPixelLorentzAngleTree_->Branch("rechit_corr", &rechitCorr_, "x/F:y/F", bufsize);
-SiPixelLorentzAngleTree_->Branch("trackhitcorr_x", &trackhitCorrX_, "trackhitcorr_x/F", bufsize);
-SiPixelLorentzAngleTree_->Branch("trackhitcorr_y", &trackhitCorrY_, "trackhitcorr_y/F", bufsize);
-SiPixelLorentzAngleTree_->Branch("qScale", &qScale_, "qScale/F", bufsize);
-SiPixelLorentzAngleTree_->Branch("rQmQt", &rQmQt_, "rQmQt/F", bufsize);
-
+SiPixelLorentzAngleTreeBarrel_->Branch("clust", &clust_, "x/F:y/F:charge/F:size_x/I:size_y/I:maxPixelCol/I:maxPixelRow:minPixelCol/I:minPixelRow/I", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("rechit", &rechit_, "x/F:y/F", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("rechit_corr", &rechitCorr_, "x/F:y/F", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("trackhitcorr_x", &trackhitCorrX_, "trackhitcorr_x/F", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("trackhitcorr_y", &trackhitCorrY_, "trackhitcorr_y/F", bufsize);
+SiPixelLorentzAngleTreeBarrel_->Branch("qScale", &qScale_, "qScale/F", bufsize);
+                    SiPixelLorentzAngleTreeBarrel_->Branch("rQmQt", &rQmQt_, "rQmQt/F", bufsize);
 //    Forward pixel
-SiPixelLorentzAngleTreeForward_ = new TTree("SiPixelLorentzAngleTreeForward_","SiPixel LorentzAngle tree forward", bufsize);
+          
+SiPixelLorentzAngleTreeForward_ = std::make_shared<TTree>("SiPixelLorentzAngleTreeForward_","SiPixel LorentzAngle tree forward", bufsize);
 SiPixelLorentzAngleTreeForward_->Branch("run", &run_, "run/I", bufsize);
 SiPixelLorentzAngleTreeForward_->Branch("event", &event_, "event/l", bufsize);
 SiPixelLorentzAngleTreeForward_->Branch("lumiblock", &lumiblock_, "lumiblock/I", bufsize);
@@ -309,9 +315,9 @@ SiPixelLorentzAngleTreeForward_->Branch("ypix", pixinfoF_.y, "y[npix]/F", bufsiz
 
 SiPixelLorentzAngleTreeForward_->Branch("clust", &clustF_, "x/F:y/F:charge/F:size_x/I:size_y/I:maxPixelCol/I:maxPixelRow:minPixelCol/I:minPixelRow/I", bufsize);
 SiPixelLorentzAngleTreeForward_->Branch("rechit", &rechitF_, "x/F:y/F", bufsize);
-SiPixelLorentzAngleTree_->Branch("rechit_corr", &rechitCorrF_, "x/F:y/F", bufsize);
-SiPixelLorentzAngleTree_->Branch("trackhitcorr_x", &trackhitCorrXF_, "trackhitcorr_x/F", bufsize);
-SiPixelLorentzAngleTree_->Branch("trackhitcorr_y", &trackhitCorrYF_, "trackhitcorr_y/F", bufsize);
+SiPixelLorentzAngleTreeForward_->Branch("rechit_corr", &rechitCorrF_, "x/F:y/F", bufsize);
+SiPixelLorentzAngleTreeForward_->Branch("trackhitcorr_x", &trackhitCorrXF_, "trackhitcorr_x/F", bufsize);
+SiPixelLorentzAngleTreeForward_->Branch("trackhitcorr_y", &trackhitCorrYF_, "trackhitcorr_y/F", bufsize);
 SiPixelLorentzAngleTreeForward_->Branch("qScale", &qScaleF_, "qScale/F", bufsize);
 SiPixelLorentzAngleTreeForward_->Branch("rQmQt", &rQmQtF_, "rQmQt/F", bufsize);
 }
@@ -420,8 +426,7 @@ void SiPixelLorentzAnglePCLWorker::dqmAnalyze(edm::Event const& iEvent,
       float tmp2 = theGeomDet->surface().toGlobal(Local3DPoint(0.,0.,1.)).perp();
 
         
-      if ( tmp2<tmp1 ) isflipped_ = 1;
-      else isflipped_ = 0;
+      isflipped_ =  ( tmp2<tmp1 ) ? 1 : 0;
       
 
           const SiPixelRecHit* recHitPix = dynamic_cast<const SiPixelRecHit*>((*recHit).hit());
@@ -466,8 +471,12 @@ void SiPixelLorentzAnglePCLWorker::dqmAnalyze(edm::Event const& iEvent,
 
           // get qScale_ = templ.qscale() and  templ.r_qMeas_qTrue();
 
-          float cotalpha = 1. / TMath::Tan(trackhit_.alpha);
-          float cotbeta = 1. / TMath::Tan(trackhit_.beta);
+//          float cotalpha = 1. / TMath::Tan(trackhit_.alpha);
+//          float cotbeta = 1. / TMath::Tan(trackhit_.beta);
+          
+          float cotalpha = trackdirection.x() / trackdirection.z();
+          float cotbeta = trackdirection.y() / trackdirection.z();
+            
           float locBx = 1.;
           if (cotbeta < 0.)
             locBx = -1.;
@@ -476,8 +485,7 @@ void SiPixelLorentzAnglePCLWorker::dqmAnalyze(edm::Event const& iEvent,
             locBz = -locBx;
 
           auto detId = detIdObj.rawId();
-          int TemplID = -9999;
-          TemplID = templateDBobject_->getTemplateID(detId);
+          int TemplID = templateDBobject_->getTemplateID(detId);
           templ.interpolate(TemplID, cotalpha, cotbeta, locBz, locBx);
           qScale_ = templ.qscale();
           rQmQt_ = templ.r_qMeas_qTrue();
@@ -494,7 +502,7 @@ void SiPixelLorentzAnglePCLWorker::dqmAnalyze(edm::Event const& iEvent,
           trackhitCorrX_ = lp_track.x();
           trackhitCorrY_ = lp_track.y();
       
-      SiPixelLorentzAngleTree_->Fill();
+      SiPixelLorentzAngleTreeBarrel_->Fill();
 
           // is one pixel in cluster a large pixel ? (hit will be excluded)
           bool large_pix = false;
@@ -567,7 +575,7 @@ void SiPixelLorentzAnglePCLWorker::dqmAnalyze(edm::Event const& iEvent,
           rechitF_.y = recHitPix->localPosition().y();
           SiPixelRecHit::ClusterRef const& cluster = recHitPix->cluster();
 
-          pixinfo_ = fillPix(*cluster, topol);
+          pixinfoF_ = fillPix(*cluster, topol);
 
           // fill entries in clust_
             
@@ -600,8 +608,12 @@ void SiPixelLorentzAnglePCLWorker::dqmAnalyze(edm::Event const& iEvent,
           trackhitF_.x = trackposition.x();
           trackhitF_.y = trackposition.y();
             
-          float cotalpha = 1. / TMath::Tan(trackhit_.alpha);
-          float cotbeta = 1. / TMath::Tan(trackhit_.beta);
+//          float cotalpha = 1. / TMath::Tan(trackhit_.alpha);
+//          float cotbeta = 1. / TMath::Tan(trackhit_.beta);
+            
+          float cotalpha = trackdirection.x() / trackdirection.z();
+          float cotbeta = trackdirection.y() / trackdirection.z();
+            
           float locBx = 1.;
           if (cotbeta < 0.)
              locBx = -1.;
@@ -610,8 +622,7 @@ void SiPixelLorentzAnglePCLWorker::dqmAnalyze(edm::Event const& iEvent,
             locBz = -locBx;
 
           auto detId = detIdObj.rawId();
-          int TemplID = -9999;
-          TemplID = templateDBobject_->getTemplateID(detId);
+          int TemplID = templateDBobject_->getTemplateID(detId);
           templ.interpolate(TemplID, cotalpha, cotbeta, locBz, locBx);
           qScaleF_ = templ.qscale();
           rQmQtF_ = templ.r_qMeas_qTrue();
@@ -685,6 +696,14 @@ void SiPixelLorentzAnglePCLWorker::bookHistograms(DQMStore::IBooker& iBooker,
   }
 }
 
+void SiPixelLorentzAnglePCLWorker::dqmEndRun(edm::Run const& run,
+                                             edm::EventSetup const& iSetup,
+                                             const SiPixelLorentzAngleCalibrationHistograms& iHists) const {
+    hFile_->cd();
+    hFile_->Write();
+    hFile_->Close();
+}
+
 // method used to fill per pixel info
 const Pixinfo SiPixelLorentzAnglePCLWorker::fillPix(const SiPixelCluster& LocPix, const PixelTopology* topol) const {
   static Pixinfo pixinfo;
@@ -725,6 +744,7 @@ const std::pair<LocalPoint, LocalPoint> SiPixelLorentzAnglePCLWorker::surface_de
 void SiPixelLorentzAnglePCLWorker::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
   desc.add<std::string>("folder", "AlCaReco/SiPixelLorentzAngle");
+  desc.add<std::string>("fileName", "testrun.root");
   desc.add<edm::InputTag>("src", edm::InputTag("TrackRefitter"));
   desc.add<double>("ptMin", 3.);
   desc.add<double>("normChi2Max", 2.);

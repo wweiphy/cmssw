@@ -1,9 +1,11 @@
 import FWCore.ParameterSet.Config as cms
 
-from DQMServices.Core.DQMEDAnalyzer import DQMEDAnalyzer
+#from DQMServices.Core.DQMEDAnalyzer import DQMEDAnalyzer
+from FWCore.ParameterSet.Config import EDProducer as DQMEDAnalyzer
 SiPixelLorentzAnglePCLWorker = DQMEDAnalyzer( 
     "SiPixelLorentzAnglePCLWorker",
     folder = cms.string('AlCaReco/SiPixelLorentzAngle'),
+    fileName = cms.string('testrun.root'),
     src = cms.InputTag("TrackRefitter"),    
     binsDepth	= cms.int32(50),
     binsDrift =	cms.int32(200),
