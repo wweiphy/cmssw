@@ -471,9 +471,6 @@ void SiPixelLorentzAnglePCLWorker::dqmAnalyze(edm::Event const& iEvent,
 
           // get qScale_ = templ.qscale() and  templ.r_qMeas_qTrue();
 
-//          float cotalpha = 1. / TMath::Tan(trackhit_.alpha);
-//          float cotbeta = 1. / TMath::Tan(trackhit_.beta);
-          
           float cotalpha = trackdirection.x() / trackdirection.z();
           float cotbeta = trackdirection.y() / trackdirection.z();
             
@@ -607,9 +604,6 @@ void SiPixelLorentzAnglePCLWorker::dqmAnalyze(edm::Event const& iEvent,
           trackhitF_.gamma = atan2(trackdirection.x(),trackdirection.y());
           trackhitF_.x = trackposition.x();
           trackhitF_.y = trackposition.y();
-            
-//          float cotalpha = 1. / TMath::Tan(trackhit_.alpha);
-//          float cotbeta = 1. / TMath::Tan(trackhit_.beta);
             
           float cotalpha = trackdirection.x() / trackdirection.z();
           float cotbeta = trackdirection.y() / trackdirection.z();
