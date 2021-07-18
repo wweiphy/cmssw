@@ -148,8 +148,8 @@ private:
   int hist_drift_;
 
   std::unique_ptr<TFile> hFile_;
-  std::shared_ptr<TTree> SiPixelLorentzAngleTreeBarrel_;
-  std::shared_ptr<TTree> SiPixelLorentzAngleTreeForward_;
+  std::unique_ptr<TTree> SiPixelLorentzAngleTreeBarrel_;
+  std::unique_ptr<TTree> SiPixelLorentzAngleTreeForward_;
 
   // es consumes
   edm::ESGetToken<TrackerGeometry, TrackerDigiGeometryRecord> geomEsToken_;
@@ -255,7 +255,7 @@ SiPixelLorentzAnglePCLWorker::SiPixelLorentzAnglePCLWorker(const edm::ParameterS
   //    Barrel pixel
   hFile_ = std::make_unique<TFile>(filename_.c_str(), "RECREATE");
   SiPixelLorentzAngleTreeBarrel_ =
-      std::make_shared<TTree>("SiPixelLorentzAngleTreeBarrel_", "SiPixel LorentzAngle tree barrel", bufsize);
+      std::make_unique<TTree>("SiPixelLorentzAngleTreeBarrel_", "SiPixel LorentzAngle tree barrel", bufsize);
   SiPixelLorentzAngleTreeBarrel_->Branch("run", &run_, "run/I", bufsize);
   SiPixelLorentzAngleTreeBarrel_->Branch("event", &event_, "event/l", bufsize);
   SiPixelLorentzAngleTreeBarrel_->Branch("lumiblock", &lumiblock_, "lumiblock/I", bufsize);
@@ -292,7 +292,7 @@ SiPixelLorentzAnglePCLWorker::SiPixelLorentzAnglePCLWorker(const edm::ParameterS
   //    Forward pixel
 
   SiPixelLorentzAngleTreeForward_ =
-      std::make_shared<TTree>("SiPixelLorentzAngleTreeForward_", "SiPixel LorentzAngle tree forward", bufsize);
+      std::make_unique<TTree>("SiPixelLorentzAngleTreeForward_", "SiPixel LorentzAngle tree forward", bufsize);
   SiPixelLorentzAngleTreeForward_->Branch("run", &run_, "run/I", bufsize);
   SiPixelLorentzAngleTreeForward_->Branch("event", &event_, "event/l", bufsize);
   SiPixelLorentzAngleTreeForward_->Branch("lumiblock", &lumiblock_, "lumiblock/I", bufsize);
