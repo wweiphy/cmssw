@@ -137,6 +137,7 @@ private:
   double max_drift_;
   double ypitch_;
   int bufsize;
+  bool newmodule[4][64][8];
 
   // parameters from config file
   double ptmin_;
@@ -249,6 +250,20 @@ SiPixelLorentzAnglePCLWorker::SiPixelLorentzAnglePCLWorker(const edm::ParameterS
   max_depth_ = 400.;
   min_drift_ = -1000.;  //-200.;(iConfig.getParameter<double>("residualMax"))
   max_drift_ = 1000.;   //400.;
+
+  for (int lay = 0; lay < 4; ++lay) {
+    for (int lad = 0; lad < 64; ++lad) {
+      for (int mod = 0; mod < 8; ++mod) {
+        newmodule[lay][lad][mod] = false;
+      }
+    }
+  }
+  newmodule[0][3][6] = true;
+  newmodule[0][5][6] = true;
+  newmodule[0][3][3] = true;
+  newmodule[0][3][1] = true;
+  newmodule[0][5][3] = true;
+  newmodule[0][7][3] = true;
 
   bufsize = 64000;
   //    create tree structure
@@ -504,6 +519,19 @@ void SiPixelLorentzAnglePCLWorker::dqmAnalyze(edm::Event const& iEvent,
 
           SiPixelLorentzAngleTreeBarrel_->Fill();
 
+          int hindex = 2 * (layer_ - 1);
+          if (layer_ == 1) {
+            if (newmodule[layer_ - 1][ladder_ - 1][module_ - 1]) {
+              hindex += 1;
+            }
+          } else {
+            if (module_ > 4) {
+              hindex += 1;
+            }
+          }
+          if (hindex < 0 || hindex > 8)
+            continue;
+
           // is one pixel in cluster a large pixel ? (hit will be excluded)
           bool large_pix = false;
           for (int j = 0; j < pixinfo_.npix; j++) {
@@ -655,7 +683,7 @@ void SiPixelLorentzAnglePCLWorker::dqmBeginRun(edm::Run const& run,
 
   PixelTopologyMap map = PixelTopologyMap(geom, tTopo);
   iHists.nlay = geom->numberOfLayers(PixelSubdetector::PixelBarrel);
-
+  iHists.nModules_.resize(iHists.nlay);
   for (int i = 0; i < iHists.nlay; i++) {
     iHists.nModules_[i] = map.getPXBModules(i + 1);
   }
