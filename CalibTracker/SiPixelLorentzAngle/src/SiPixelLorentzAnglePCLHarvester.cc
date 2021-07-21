@@ -71,7 +71,7 @@ void SiPixelLorentzAnglePCLHarvester::beginRun(const edm::Run& iRun, const edm::
 
   PixelTopologyMap map = PixelTopologyMap(geom, tTopo);
   hists.nlay = geom->numberOfLayers(PixelSubdetector::PixelBarrel);
-
+  hists.nModules_.resize(hists.nlay);
   for (int i = 0; i < hists.nlay; i++) {
     hists.nModules_[i] = map.getPXBModules(i + 1);
   }
@@ -144,30 +144,55 @@ void SiPixelLorentzAnglePCLHarvester::dqmEndJob(DQMStore::IBooker& iBooker, DQMS
   double min_drift_ = hists.h_drift_depth_adc_[1]->getAxisMin(1);
   double max_drift_ = hists.h_drift_depth_adc_[1]->getAxisMax(1);
 
-  iBooker.setCurrentFolder("AlCaReco/SiPixelLorentzAngleHarvesting/");
+  iBooker.setCurrentFolder(dqmDir_);
   MonitorElement* h_drift_depth_adc_slice_ =
       iBooker.book1D("h_drift_depth_adc_slice", "slice of adc histogram", hist_drift_, min_drift_, max_drift_);
 
-  TF1* f1 = new TF1("f1", "[0] + [1]*x", 50., 235.);
-  f1->SetParName(0, "p0");
-  f1->SetParName(1, "p1");
+  TF1* f1 = new TF1("f1", "[0] + [1]*x + [2]*x*x + [3]*x*x*x + [4]*x*x*x*x + [5]*x*x*x*x*x", 5., 280.);
+  f1->SetParName(0, "offset");
+  f1->SetParName(1, "tan#theta_{LA}");
+  f1->SetParName(2, "quad term");
+  f1->SetParName(3, "cubic term");
+  f1->SetParName(4, "quartic term");
+  f1->SetParName(5, "quintic term");
   f1->SetParameter(0, 0);
   f1->SetParameter(1, 0.4);
+  f1->SetParameter(2, 0.0);
+  f1->SetParameter(3, 0.0);
+  f1->SetParameter(4, 0.0);
+  f1->SetParameter(5, 0.0);
+
   std::cout << "module"
             << "\t"
             << "layer"
             << "\t"
             << "offset"
             << "\t"
-            << "error"
+            << "e0"
             << "\t"
             << "slope"
             << "\t"
-            << "error"
+            << "e1"
             << "\t"
                "rel.err"
             << "\t"
                "pull"
+            << "\t"
+            << "p2"
+            << "\t"
+            << "e2"
+            << "\t"
+            << "p3"
+            << "\t"
+            << "e3"
+            << "\t"
+            << "p4"
+            << "\t"
+            << "e4"
+            << "\t"
+            << "p5"
+            << "\t"
+            << "e5"
             << "\t"
             << "chi2"
             << "\t"
@@ -185,16 +210,26 @@ void SiPixelLorentzAnglePCLHarvester::dqmEndJob(DQMStore::IBooker& iBooker, DQMS
 
         findMean(h_drift_depth_adc_slice_, i, i_index);
       }  // end loop over bins in depth
+//      int x = i_module + i_layer * hists.nModules_[i_layer - 1];
       hists.h_mean_[i_index]->getTH1()->Fit(f1, "ERQ");
       double p0 = f1->GetParameter(0);
       double e0 = f1->GetParError(0);
       double p1 = f1->GetParameter(1);
       double e1 = f1->GetParError(1);
+      double p2 = f1->GetParameter(2);
+      double e2 = f1->GetParError(2);
+      double p3 = f1->GetParameter(3);
+      double e3 = f1->GetParError(3);
+      double p4 = f1->GetParameter(4);
+      double e4 = f1->GetParError(4);
+      double p5 = f1->GetParameter(5);
+      double e5 = f1->GetParError(5);
       double chi2 = f1->GetChisquare();
       double prob = f1->GetProb();
       std::cout << std::setprecision(4) << i_module << "\t" << i_layer << "\t" << p0 << "\t" << e0 << "\t" << p1
                 << std::setprecision(3) << "\t" << e1 << "\t" << e1 / p1 * 100. << "\t" << (p1 - 0.424) / e1 << "\t"
-                << chi2 << "\t" << prob << std::endl;
+                << p2 << "\t" << e2 << "\t" << p3 << "\t" << e3 << "\t" << p4 << "\t" << e4 << "\t" << p5 << "\t" << e5
+                << "\t" << chi2 << "\t" << prob << std::endl;
 
       const auto& detIdsToFill = hists.detIdsList.at(i_index);
 
@@ -322,7 +357,6 @@ void SiPixelLorentzAnglePCLHarvester::findMean(MonitorElement* h_drift_depth_adc
   if (nentries != 0) {
     error = h_drift_depth_adc_slice_->getRMS(1) / std::sqrt(nentries);
   }
-
   hists.h_mean_[i_ring]->setBinContent(i, mean);
   hists.h_mean_[i_ring]->setBinError(i, error);
 }
