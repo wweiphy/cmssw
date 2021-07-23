@@ -144,7 +144,7 @@ void SiPixelLorentzAnglePCLHarvester::dqmEndJob(DQMStore::IBooker& iBooker, DQMS
   double min_drift_ = hists.h_drift_depth_adc_[1]->getAxisMin(1);
   double max_drift_ = hists.h_drift_depth_adc_[1]->getAxisMax(1);
 
-  iBooker.setCurrentFolder(dqmDir_);
+  iBooker.setCurrentFolder("AlCaReco/SiPixelLorentzAngleHarvesting/");
   MonitorElement* h_drift_depth_adc_slice_ =
       iBooker.book1D("h_drift_depth_adc_slice", "slice of adc histogram", hist_drift_, min_drift_, max_drift_);
 
