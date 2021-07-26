@@ -15,5 +15,5 @@ SiPixelLorentzAnglePCLWorker = DQMEDAnalyzer(
     clustSizeYMinL4 = cms.double(2.999999),
     clustSizeXMax = cms.double(5),
     residualMax = cms.double(0.005),
-    clustChargeMax = cms.double(50000)
+    clustChargeMaxPerLength = cms.double(50000)
 )
