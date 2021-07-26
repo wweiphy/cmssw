@@ -210,7 +210,6 @@ void SiPixelLorentzAnglePCLHarvester::dqmEndJob(DQMStore::IBooker& iBooker, DQMS
 
         findMean(h_drift_depth_adc_slice_, i, i_index);
       }  // end loop over bins in depth
-//      int x = i_module + i_layer * hists.nModules_[i_layer - 1];
       hists.h_mean_[i_index]->getTH1()->Fit(f1, "ERQ");
       double p0 = f1->GetParameter(0);
       double e0 = f1->GetParError(0);
