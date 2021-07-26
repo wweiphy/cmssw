@@ -147,7 +147,7 @@ private:
   double clustSizeYMinL4_;
   double clustSizeXMax_;
   double residualMax_;
-  double clustChargeMax_;
+  double clustChargeMaxPerLength_;
   int hist_depth_;
   int hist_drift_;
 
@@ -234,7 +234,7 @@ SiPixelLorentzAnglePCLWorker::SiPixelLorentzAnglePCLWorker(const edm::ParameterS
       clustSizeYMinL4_(iConfig.getParameter<double>("clustSizeYMinL4")),
       clustSizeXMax_(iConfig.getParameter<double>("clustSizeXMax")),
       residualMax_(iConfig.getParameter<double>("residualMax")),
-      clustChargeMax_(iConfig.getParameter<double>("clustChargeMax")),
+      clustChargeMaxPerLength_(iConfig.getParameter<double>("clustChargeMaxPerLength")),
       hist_depth_(iConfig.getParameter<int>("binsDepth")),
       hist_drift_(iConfig.getParameter<int>("binsDrift")),
       geomEsToken_(esConsumes<edm::Transition::BeginRun>()),
@@ -490,7 +490,7 @@ void SiPixelLorentzAnglePCLWorker::dqmAnalyze(edm::Event const& iEvent,
           if (fabs(cotbeta) <= cotbeta_min)
             continue;
           double drdz = sqrt(1. + cotalpha * cotalpha + cotbeta * cotbeta);
-          double clusterCharge_cut = clustChargeMax_ * drdz;
+          double clusterCharge_cut = clustChargeMaxPerLength_ * drdz;
 
           float locBx = 1.;
           if (cotbeta < 0.)
@@ -780,7 +780,7 @@ void SiPixelLorentzAnglePCLWorker::fillDescriptions(edm::ConfigurationDescriptio
   desc.add<double>("clustSizeYMinL4", 2.999999);
   desc.add<double>("clustSizeXMax", 5.0);
   desc.add<double>("residualMax", 0.005);
-  desc.add<double>("clustChargeMax", 50000);
+  desc.add<double>("clustChargeMaxPerLength", 50000);
   desc.add<int>("binsDepth", 50);
   desc.add<int>("binsDrift", 200);
   descriptions.addWithDefaultLabel(desc);
