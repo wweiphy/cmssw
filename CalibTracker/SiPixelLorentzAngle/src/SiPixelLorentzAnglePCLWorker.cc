@@ -136,8 +136,6 @@ private:
   double max_depth_;
   double min_drift_;
   double max_drift_;
-  double ypitch_;
-  double cotbeta_min;
   int bufsize;
 
   // parameters from config file
@@ -256,8 +254,6 @@ SiPixelLorentzAnglePCLWorker::SiPixelLorentzAnglePCLWorker(const edm::ParameterS
   max_depth_ = 400.;
   min_drift_ = -1000.;  //-200.;(iConfig.getParameter<double>("residualMax"))
   max_drift_ = 1000.;   //400.;
-  ypitch_ = 0.0150;
-  cotbeta_min = clustSizeYMin_ * ypitch_ / width_;
 
   bufsize = 64000;
   //    create tree structure
@@ -431,6 +427,8 @@ void SiPixelLorentzAnglePCLWorker::dqmAnalyze(edm::Event const& iEvent,
             continue;
 
           const PixelTopology* topol = &(theGeomDet->specificTopology());
+         
+          float ypitch_ = topol->pitch().second;
 
           if (!topol)
             continue;
@@ -487,6 +485,7 @@ void SiPixelLorentzAnglePCLWorker::dqmAnalyze(edm::Event const& iEvent,
 
           float cotalpha = trackdirection.x() / trackdirection.z();
           float cotbeta = trackdirection.y() / trackdirection.z();
+          float cotbeta_min = clustSizeYMin_ * ypitch_ / width_;
           if (fabs(cotbeta) <= cotbeta_min)
             continue;
           double drdz = sqrt(1. + cotalpha * cotalpha + cotbeta * cotbeta);
