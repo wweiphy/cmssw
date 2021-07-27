@@ -141,9 +141,9 @@ private:
   // parameters from config file
   double ptmin_;
   double normChi2Max_;
-  double clustSizeYMin_;
-  double clustSizeYMinL4_;
-  double clustSizeXMax_;
+  int clustSizeYMin_;
+  int clustSizeYMinL4_;
+  int clustSizeXMax_;
   double residualMax_;
   double clustChargeMaxPerLength_;
   int hist_depth_;
@@ -228,9 +228,9 @@ SiPixelLorentzAnglePCLWorker::SiPixelLorentzAnglePCLWorker(const edm::ParameterS
       filename_(iConfig.getParameter<std::string>("fileName")),
       ptmin_(iConfig.getParameter<double>("ptMin")),
       normChi2Max_(iConfig.getParameter<double>("normChi2Max")),
-      clustSizeYMin_(iConfig.getParameter<double>("clustSizeYMin")),
-      clustSizeYMinL4_(iConfig.getParameter<double>("clustSizeYMinL4")),
-      clustSizeXMax_(iConfig.getParameter<double>("clustSizeXMax")),
+      clustSizeYMin_(iConfig.getParameter<int>("clustSizeYMin")),
+      clustSizeYMinL4_(iConfig.getParameter<int>("clustSizeYMinL4")),
+      clustSizeXMax_(iConfig.getParameter<int>("clustSizeXMax")),
       residualMax_(iConfig.getParameter<double>("residualMax")),
       clustChargeMaxPerLength_(iConfig.getParameter<double>("clustChargeMaxPerLength")),
       hist_depth_(iConfig.getParameter<int>("binsDepth")),
@@ -538,7 +538,7 @@ void SiPixelLorentzAnglePCLWorker::dqmAnalyze(edm::Event const& iEvent,
           double ylim1 = trackhitCorrY_ - width_ * cotbeta / 2.;
           double ylim2 = trackhitCorrY_ + width_ * cotbeta / 2.;
 
-          double clustSizeY_cut;
+          int clustSizeY_cut;
           if (layer_ < 4) {
             clustSizeY_cut = clustSizeYMin_;
           } else {
@@ -775,9 +775,9 @@ void SiPixelLorentzAnglePCLWorker::fillDescriptions(edm::ConfigurationDescriptio
   desc.add<edm::InputTag>("src", edm::InputTag("TrackRefitter"));
   desc.add<double>("ptMin", 3.);
   desc.add<double>("normChi2Max", 2.);
-  desc.add<double>("clustSizeYMin", 3.999999);
-  desc.add<double>("clustSizeYMinL4", 2.999999);
-  desc.add<double>("clustSizeXMax", 5.0);
+  desc.add<int>("clustSizeYMin", 4);
+  desc.add<int>("clustSizeYMinL4", 3);
+  desc.add<int>("clustSizeXMax", 5);
   desc.add<double>("residualMax", 0.005);
   desc.add<double>("clustChargeMaxPerLength", 50000);
   desc.add<int>("binsDepth", 50);
