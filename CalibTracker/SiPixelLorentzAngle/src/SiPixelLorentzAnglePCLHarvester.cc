@@ -148,20 +148,6 @@ void SiPixelLorentzAnglePCLHarvester::dqmEndJob(DQMStore::IBooker& iBooker, DQMS
   MonitorElement* h_drift_depth_adc_slice_ =
       iBooker.book1D("h_drift_depth_adc_slice", "slice of adc histogram", hist_drift_, min_drift_, max_drift_);
 
-  TF1* f1 = new TF1("f1", "[0] + [1]*x + [2]*x*x + [3]*x*x*x + [4]*x*x*x*x + [5]*x*x*x*x*x", 5., 280.);
-  f1->SetParName(0, "offset");
-  f1->SetParName(1, "tan#theta_{LA}");
-  f1->SetParName(2, "quad term");
-  f1->SetParName(3, "cubic term");
-  f1->SetParName(4, "quartic term");
-  f1->SetParName(5, "quintic term");
-  f1->SetParameter(0, 0);
-  f1->SetParameter(1, 0.4);
-  f1->SetParameter(2, 0.0);
-  f1->SetParameter(3, 0.0);
-  f1->SetParameter(4, 0.0);
-  f1->SetParameter(5, 0.0);
-
   std::cout << "module"
             << "\t"
             << "layer"
@@ -210,6 +196,21 @@ void SiPixelLorentzAnglePCLHarvester::dqmEndJob(DQMStore::IBooker& iBooker, DQMS
 
         findMean(h_drift_depth_adc_slice_, i, i_index);
       }  // end loop over bins in depth
+      
+      TF1* f1 = new TF1("f1", "[0] + [1]*x + [2]*x*x + [3]*x*x*x + [4]*x*x*x*x + [5]*x*x*x*x*x", 5., 280.);
+      f1->SetParName(0, "offset");
+      f1->SetParName(1, "tan#theta_{LA}");
+      f1->SetParName(2, "quad term");
+      f1->SetParName(3, "cubic term");
+      f1->SetParName(4, "quartic term");
+      f1->SetParName(5, "quintic term");
+      f1->SetParameter(0, 0);
+      f1->SetParameter(1, 0.4);
+      f1->SetParameter(2, 0.0);
+      f1->SetParameter(3, 0.0);
+      f1->SetParameter(4, 0.0);
+      f1->SetParameter(5, 0.0);
+      
       hists.h_mean_[i_index]->getTH1()->Fit(f1, "ERQ");
       double p0 = f1->GetParameter(0);
       double e0 = f1->GetParError(0);
@@ -231,6 +232,7 @@ void SiPixelLorentzAnglePCLHarvester::dqmEndJob(DQMStore::IBooker& iBooker, DQMS
                 << "\t" << chi2 << "\t" << prob << std::endl;
 
       const auto& detIdsToFill = hists.detIdsList.at(i_index);
+      delete f1;
 
       /*
       std::cout << i_index << " ";
